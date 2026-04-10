@@ -84,9 +84,7 @@ El sistema no opera como una secuencia lineal, sino como un **flujo condicional 
 
 </div>
 
-<br/>
 
-> ⚠️ **Para que la imagen aparezca:** sube el archivo `arquitectura_aestimus.png` a la **raíz** de tu repositorio en GitHub.
 
 <br/>
 
@@ -234,5 +232,3 @@ Ver [`LICENSE`](LICENSE) para más información.
 [![Visitors](https://visitor-badge.laobi.icu/badge?page_id=eddyluismamanicusi-netizen.AESTIMUS-Consulting&left_color=161b22&right_color=58a6ff&left_text=visitors)](https://github.com/eddyluismamanicusi-netizen/AESTIMUS-Consulting)
 
 </div>
-
-
