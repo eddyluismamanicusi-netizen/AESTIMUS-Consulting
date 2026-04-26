@@ -1,0 +1,838 @@
+{
+  "name": "Bot-gestion-aestimus-final",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true,
+          "imageSize": "large"
+        }
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -464,
+        160
+      ],
+      "id": "e5412cc5-689b-4ce6-84f6-a1ca7a831095",
+      "name": "Telegram Trigger",
+      "webhookId": "b0a9c8d7e6f5g4h3",
+      "credentials": {
+        "telegramApi": {
+          "id": "lEIDK4Z8KECUOfbU",
+          "name": "Nexum"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=={{ ($('Telegram Trigger').first().json.message?.text || $('Telegram Trigger').first().json.message?.caption || '') }}\n",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Eres un extractor de datos para un bot de gestión de obra de construcción. Tu ÚNICA tarea es analizar el mensaje de texto recibido, identificar su clase y extraer los datos exactos.\n\nIMPORTANTE: Solo recibirás mensajes de texto (solos o con imagen adjunta). Los archivos .txt son procesados por otra rama del sistema y NUNCA llegarán aquí.\n\nCLASES POSIBLES:\n- 1A: Texto con datos BIM de UN elemento (puede incluir fotografía).\n  Campos requeridos: Id Elemento, Fecha de Ejecución, % de Ejecución. (3 datos)\n- 2A: Texto con datos Tradicionales de UNA partida (puede incluir fotografía).\n  Campos requeridos: Código de Partida (formato tipo \"0.2.1.2.6\"), Subcódigo (número entero), Metrado Ejecutado, Fecha de Ejecución, % de Ejecución. (5 datos)\n- INVALIDO: Falta alguno de los campos clave obligatorios o el mensaje no tiene sentido.\n\nREGLAS CRÍTICAS:\n1. Devuelve SOLO JSON válido, sin markdown ni backticks (```json), ni texto extra. NUNCA devuelvas texto plano. La salida DEBE ser siempre este objeto JSON con los campos EXACTAMENTE como están escritos aquí:\n{\n  \"Clase\": \"1A\" o \"2A\" o \"INVALIDO\",\n  \"tiene_foto\": false,\n  \"filas\": [\n    {\n      \"Id Elemento\": \"texto_o_null\",\n      \"Código de Partida\": \"texto_o_null\",\n      \"Subcódigo\": numero_entero_o_null,\n      \"Metrado Ejecutado\": numero_o_null,\n      \"Fecha de Ejecución\": \"texto_fecha_o_null\",\n      \"% de Ejecución\": numero_o_null\n    }\n  ],\n  \"mensaje_error\": \"texto_o_null\"\n}\n\n2. No inventes datos. Si no puedes extraer un campo obligatorio, usa null.\n3. \"filas\" tendrá SIEMPRE EXACTAMENTE UN objeto (un solo registro por mensaje).\n4. \"Id Elemento\" aplica SOLO a Clase 1A. \"Código de Partida\" y \"Subcódigo\" aplican SOLO a Clase 2A. Los campos que no apliquen ponlos en null.\n5. \"Código de Partida\" tiene siempre un formato de viñeta numérica con puntos, por ejemplo: \"0.2.1.2.6\" o \"02.01\". Extráelo tal cual lo escribió el usuario. \"Subcódigo\" es un número entero simple (ej: 3, 12, 150).\n6. Si la clase es INVALIDO, \"filas\" debe ser [] y en \"mensaje_error\" DEBES escribir un texto amigable explicando las 2 formas válidas de enviar datos:\n   - 1A: Datos BIM de un elemento (Id Elemento, Fecha de Ejecución, % de Ejecución).\n   - 2A: Datos tradicionales de una partida (Código de Partida, Subcódigo, Metrado Ejecutado, Fecha de Ejecución, % de Ejecución).\n7. FECHAS: El usuario puede escribir la fecha con guiones (25-03-2025), slashes (25/03/2025) o puntos (25.03.2025). Normaliza SIEMPRE al formato YYYY-MM-DD sin importar cómo llegue.\n8. NÚMEROS: El porcentaje de ejecución puede llegar sin el símbolo \"%\" (ej: \"75\" en lugar de \"75%\"). El metrado ejecutado puede llegar sin unidad (ej: \"12.5\" en lugar de \"12.5 m²\"). Extrae siempre el valor numérico puro, sin texto ni símbolos.\n9. MENSAJES COMPACTOS: Si el mensaje no tiene espacios o tiene muy pocos, guíate por las comas para separar los campos. La cantidad de valores separados por comas es una pista clave para identificar la clase:\n   - 3 valores separados por comas → probablemente Clase 1A (Id Elemento, Fecha, % Ejecución).\n   - 5 valores separados por comas → probablemente Clase 2A (Código de Partida, Subcódigo, Metrado, Fecha, % Ejecución).\n   Usa el conteo de comas como guía inicial, luego valida que los valores tengan sentido para la clase.\n10. SINÓNIMOS: El usuario puede usar \"Avance\" por \"% de Ejecución\", \"ID\" por \"Id Elemento\", \"Código\" por \"Código de Partida\", \"Sub\" o \"Subpartida\" por \"Subcódigo\", \"Fecha ejecutada\" o \"Fecha\" por \"Fecha de Ejecución\". Entiende la intención pero MAPÉALOS siempre bajo las claves exactas de la Regla 1.\n11. \"tiene_foto\" déjalo SIEMPRE en false. Es detectado externamente con mayor fiabilidad."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -16,
+        0
+      ],
+      "id": "563c0931-17f2-4ef2-8282-108f3dc79b43",
+      "name": "Clasificador IA"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "161c2c99-3355-4bf2-87a7-b7219515d37b",
+              "leftValue": "={{ $json.message?.document?.file_name }}",
+              "rightValue": ".txt",
+              "operator": {
+                "type": "string",
+                "operation": "endsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -240,
+        160
+      ],
+      "id": "c87a6047-902b-47e4-bee0-e09ab4fbd633",
+      "name": "¿Tiene archivo .txt?"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.document.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        48,
+        400
+      ],
+      "id": "8272ec1e-5a16-480f-bd3c-32e1530062b2",
+      "name": "Leer contenido .txt",
+      "webhookId": "b99e767e-c87d-4807-aafb-68342fe026a0",
+      "credentials": {
+        "telegramApi": {
+          "id": "lEIDK4Z8KECUOfbU",
+          "name": "Nexum"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet result = [];\n\nlet telegramData = {};\ntry {\n  telegramData = $('Telegram Trigger').first().json || {};\n} catch (e) {}\n\n// ── Helpers ──────────────────────────────────────────────────────\n\n// Normaliza texto: minúsculas + sin acentos\nconst norm = (s) => s.toLowerCase().normalize(\"NFD\").replace(/[\\u0300-\\u036f]/g, \"\").trim();\n\n// Convierte a número decimal (acepta comas como decimal y quita %)\nconst toNum = (val) => {\n  if (!val) return null;\n  const n = parseFloat(val.toString().replace(/%/g, '').replace(',', '.').trim());\n  return isNaN(n) ? null : n;\n};\n\n// Convierte a entero\nconst toInt = (val) => {\n  if (!val) return null;\n  const n = parseInt(val.toString().trim(), 10);\n  return isNaN(n) ? null : n;\n};\n\n// Detecta separador dominante en una línea (tabulación o coma)\nconst detectSep = (line) => {\n  const tabs   = (line.match(/\\t/g) || []).length;\n  const commas = (line.match(/,/g)  || []).length;\n  return tabs >= commas ? '\\t' : ',';\n};\n\n// Términos que sugieren que una línea es encabezado\nconst HEADER_TERMS = [\n  \"id\", \"elemento\", \"codigo\", \"partida\", \"subcodigo\",\n  \"subpartida\", \"sub\", \"metrado\", \"fecha\", \"ejecucion\",\n  \"avance\", \"porcentaje\"\n];\nconst looksLikeHeader = (line, sep) =>\n  line.split(sep).some(col => HEADER_TERMS.some(t => norm(col).includes(t)));\n\n// Busca el índice de una columna por términos clave (sobre headers ya separados)\nconst findIdx = (headers, terms) =>\n  headers.findIndex(h => terms.some(t => norm(h).includes(t)));\n\n// Construye un objeto fila a partir de valores y mapa de columnas\nconst buildFila = (cols, colMap) => {\n  const get = (idx) => (idx !== -1 && cols[idx] !== undefined) ? cols[idx].trim() || null : null;\n  return {\n    \"Id Elemento\":       get(colMap.id),\n    \"Código de Partida\": get(colMap.cod),\n    \"Subcódigo\":         toInt(get(colMap.sub)),\n    \"Metrado Ejecutado\": toNum(get(colMap.met)),\n    \"Fecha de Ejecución\":get(colMap.fec),\n    \"% de Ejecución\":    toNum(get(colMap.por))\n  };\n};\n\n// Mapas posicionales fijos cuando NO hay encabezados detectables\n// 1B → 3 columnas: Id Elemento | Fecha de Ejecución | % de Ejecución\nconst COLMAP_1B = { id: 0, cod: -1, sub: -1, met: -1, fec: 1, por: 2 };\n// 2B → 5 columnas: Código de Partida | Subcódigo | Metrado | Fecha | %\nconst COLMAP_2B = { id: -1, cod: 0, sub: 1, met: 2, fec: 3, por: 4 };\n\n// ── Procesamiento principal ───────────────────────────────────────\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  let buffer         = null;\n  let msjError       = null;\n  let filas          = [];\n  let claseDetectada = \"INVALIDO\";\n\n  // 1. Obtener datos binarios del archivo\n  let binaryKey = null;\n  if (item.binary && Object.keys(item.binary).length > 0) {\n    binaryKey = Object.keys(item.binary)[0];\n  }\n\n  if (!binaryKey) {\n    msjError = \"No se encontró archivo adjunto.\";\n  } else {\n    try {\n      buffer = await this.helpers.getBinaryDataBuffer(i, binaryKey);\n    } catch (e) {\n      const binObj = item.binary[binaryKey];\n      if (binObj && binObj.data) {\n        buffer = (typeof binObj.data === 'string')\n          ? Buffer.from(binObj.data, binObj.data.includes('\\t') || binObj.data.includes('\\n') ? 'utf-8' : 'base64')\n          : binObj.data;\n      }\n    }\n  }\n\n  // 2. Procesar el contenido del archivo\n  if (buffer) {\n    try {\n      // Detección de codificación\n      let texto = buffer.toString('latin1');\n      if (texto.includes('\\u0000') || (buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xFE)) {\n        texto = buffer.toString('utf16le');\n      }\n\n      const lineas = texto.split(/\\r?\\n/).filter(l => l.trim() !== '');\n\n      if (lineas.length < 1) {\n        msjError = \"El archivo está vacío.\";\n      } else {\n        // Detectar separador a partir de la primera línea\n        const sep = detectSep(lineas[0]);\n\n        // ── ESTRATEGIA A: el archivo tiene encabezados reconocibles ──\n        if (lineas.length >= 2 && looksLikeHeader(lineas[0], sep)) {\n\n          const headers = lineas[0].split(sep).map(h => h.trim());\n          const colMap  = {\n            id:  findIdx(headers, [\"id elemento\", \"elemento\", \"id\"]),\n            cod: findIdx(headers, [\"codigo de partida\", \"codigo\", \"partida\"]),\n            sub: findIdx(headers, [\"subcodigo\", \"subpartida\", \"sub\"]),\n            met: findIdx(headers, [\"metrado ejecutado\", \"metrado\"]),\n            fec: findIdx(headers, [\"fecha de ejecucion\", \"fecha ejecutada\", \"fecha ejecucion\", \"fecha\"]),\n            por: findIdx(headers, [\"%\", \"porcentaje\", \"avance\", \"ejecucion\"])\n          };\n\n          if      (colMap.id  !== -1) claseDetectada = \"1B\";\n          else if (colMap.cod !== -1) claseDetectada = \"2B\";\n          else msjError = \"Encabezados no reconocidos: no se detectó 'Id Elemento' ni 'Código de Partida'.\";\n\n          if (!msjError) {\n            for (let j = 1; j < lineas.length; j++) {\n              const cols = lineas[j].split(sep);\n              if (cols.length < 2) continue;\n              filas.push(buildFila(cols, colMap));\n            }\n          }\n\n        } else {\n          // ── ESTRATEGIA B: sin encabezados — mapeo posicional por columnas ──\n          // Se guía por la cantidad de columnas en la primera fila de datos.\n          // 3 columnas → Clase 1B (Id Elemento, Fecha de Ejecución, % de Ejecución)\n          // 5 columnas → Clase 2B (Código, Subcódigo, Metrado, Fecha, %)\n\n          const numCols = lineas[0].split(sep).length;\n\n          if (numCols === 3) {\n            claseDetectada = \"1B\";\n            for (let j = 0; j < lineas.length; j++) {\n              const cols = lineas[j].split(sep);\n              if (cols.length < 3) continue;\n              filas.push(buildFila(cols, COLMAP_1B));\n            }\n          } else if (numCols === 5) {\n            claseDetectada = \"2B\";\n            for (let j = 0; j < lineas.length; j++) {\n              const cols = lineas[j].split(sep);\n              if (cols.length < 5) continue;\n              filas.push(buildFila(cols, COLMAP_2B));\n            }\n          } else {\n            msjError =\n              `No se pudo determinar la clase del archivo: tiene ${numCols} columna(s). ` +\n              `Se esperan 3 (Clase 1B: Id Elemento, Fecha, % Ejecución) ` +\n              `o 5 (Clase 2B: Código de Partida, Subcódigo, Metrado, Fecha, % Ejecución).`;\n          }\n        }\n\n        if (!msjError && filas.length === 0) {\n          msjError = \"El archivo no contiene filas de datos válidas. Verifica que use tabulaciones o comas como separador.\";\n        }\n      }\n\n    } catch (err) {\n      msjError       = \"Error de procesamiento: \" + err.message;\n      claseDetectada = \"INVALIDO\";\n    }\n  }\n\n  result.push({\n    json: {\n      ...telegramData,\n      \"Clase\":          msjError ? \"INVALIDO\" : claseDetectada,\n      \"tiene_foto\":     false,\n      \"filas\":          filas,\n      \"mensaje_error\":  msjError\n    }\n  });\n}\n\nreturn result;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        400
+      ],
+      "id": "459f8dcb-fd60-4abb-a139-e362826ba4d7",
+      "name": "Procesar contenido"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "e69c2ddc-bea0-49f0-82ba-e8be2e786cb8",
+              "leftValue": "={{ $json.Clase }}",
+              "rightValue": "INVALIDO",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        560,
+        256
+      ],
+      "id": "09ef610e-47f4-4884-897c-5407dbd5ddfc",
+      "name": "¿Es inválido?"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Clase }}",
+                    "rightValue": "1A",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bf287ddc-ac66-418e-987d-8f62fab77ce2"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2db19e9a-c9b0-41f6-9928-d1a676071d6b",
+                    "leftValue": "={{ $json.Clase }}",
+                    "rightValue": "1B",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cfa6c059-3fec-4ac9-967a-d2198e46b02b",
+                    "leftValue": "={{ $json.Clase }}",
+                    "rightValue": "2A",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "dcd69818-803e-47ae-829e-95718ec02479",
+                    "leftValue": "={{ $json.Clase }}",
+                    "rightValue": "2B",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        784,
+        320
+      ],
+      "id": "7f63d7fa-f0fd-4827-a00e-30b0cc48ad1f",
+      "name": "Enrutar por Clase"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst claseActual = item.Clase || item.clase || \"INVALIDO\";\nreturn item.filas.map(f => ({ \n    json: { \n        clase: claseActual, \n        ...f, \n        url_foto: \"No se registra\" \n    } \n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        592
+      ],
+      "id": "20cbaf54-9fcd-4d7f-b217-d8954973e29c",
+      "name": "Preparar filas TXT"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1904,
+        352
+      ],
+      "id": "f9b1ccad-a22e-4701-9a26-0a8e0a91899a",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        176
+      ],
+      "id": "2bb2a946-e889-46db-a732-6cb332ace0f1",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "NgeQwyraA94mRRAV",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=❌ {{ $json.mensaje_error || \"El mensaje no pudo ser procesado.\" }}\n\n📋 *Formatos de entrada válidos:*\n\n🔹 *1A — Elemento BIM por mensaje \\(± foto\\)*\nEnvía 3 datos separados por coma:\nId Elemento, Fecha, % de Avance\n_Ejemplo:_ `E-101, 25-03-2025, 75`\n\n🔹 *1B — Múltiples elementos BIM \\(archivo \\.txt\\)*\nArchivo con 3 columnas por fila \\(Tab o coma\\):\nId Elemento | Fecha | % de Avance\n_Ejemplo fila:_ `E-101, 25-03-2025, 75`\n\n🔹 *2A — Partida tradicional por mensaje \\(± foto\\)*\nEnvía 5 datos separados por coma:\nCódigo, Subcódigo, Metrado, Fecha, % de Avance\n_Ejemplo:_ `03.01.02, 3, 12.5, 25-03-2025, 60`\n\n🔹 *2B — Múltiples partidas \\(archivo \\.txt\\)*\nArchivo con 5 columnas por fila \\(Tab o coma\\):\nCódigo | Subcódigo | Metrado | Fecha | % de Avance\n_Ejemplo fila:_ `03.01.02, 3, 12.5, 25-03-2025, 60`",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        784,
+        112
+      ],
+      "id": "28dd3889-97c4-49a1-901b-8d487f9cf26f",
+      "name": "Enviar error",
+      "webhookId": "8cf0e947-8267-463d-b3fa-7967f95c9b44",
+      "credentials": {
+        "telegramApi": {
+          "id": "lEIDK4Z8KECUOfbU",
+          "name": "Nexum"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Obtiene el texto de la IA y lo limpia de posibles marcadores de markdown\nlet textoIA = $input.first().json.text;\ntextoIA = textoIA.replace(/```json/g, '').replace(/```/g, '').trim();\n\n// 2. Convierte el texto en objeto JSON\nconst datosParseados = JSON.parse(textoIA);\n\n// 3. DETECCIÓN DE FOTO — lee directamente los metadatos de Telegram\n//    Usamos .first() para garantizar que apunta al mensaje original del trigger\nconst mensajeTelegram = $('Telegram Trigger').first().json.message;\n\nif (mensajeTelegram && mensajeTelegram.photo && mensajeTelegram.photo.length > 0) {\n    datosParseados.tiene_foto = true;\n} else {\n    datosParseados.tiene_foto = false;\n}\n\n// 4. Retorna el JSON corregido\nreturn [{ json: datosParseados }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        112
+      ],
+      "id": "c95dffd7-0c9e-4beb-a170-c6121b4fd07e",
+      "name": "Text a json",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "41731237-77fe-4f48-8d9e-da3d8030742e",
+              "leftValue": "={{ $('¿Es inválido?').item.json.tiene_foto }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7b8ad1b5-6718-4d2b-919a-6077f4e9738c",
+      "name": "¿Se tiene una imagen?",
+      "position": [
+        992,
+        240
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1zNjVVcbXH7APbY8lR-p-eHG6a6EzWOkIYZUBDf8NF-c",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1272153423,
+          "mode": "list",
+          "cachedResultName": "Raw data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nIVOM20xostmEh_DVXpjMyj-AQK30cAMVDflalhjGQU/edit#gid=1272153423"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Id Elemento": "={{ $json['Id Elemento'] || null}}",
+            "Código de Partida": "={{ $json['Código de Partida'] || null }}",
+            "Subcódigo": "={{ $json['Subcódigo'] || null}}",
+            "Metrado Ejecutado": "={{ $json['Metrado Ejecutado'] || null}}",
+            "Fecha de Ejecución": "={{ $json['Fecha de Ejecución'] || null}}",
+            "% de Ejecución": "={{ $json['% de Ejecución'] || null}}",
+            "Fotografía": "={{ $json.url_foto }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Id Elemento",
+              "displayName": "Id Elemento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Código de Partida",
+              "displayName": "Código de Partida",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subcódigo",
+              "displayName": "Subcódigo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Metrado Ejecutado",
+              "displayName": "Metrado Ejecutado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fecha de Ejecución",
+              "displayName": "Fecha de Ejecución",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "% de Ejecución",
+              "displayName": "% de Ejecución",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fotografía",
+              "displayName": "Fotografía",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "locationDefine": {
+            "values": {
+              "headerRow": 2
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2144,
+        352
+      ],
+      "id": "e9f8849c-2f4b-4da6-a6d8-8e1a7691b1f1",
+      "name": "Guardar en Base Data",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ENoDp0ZcmUdqta0p",
+          "name": "Google_Sheets_Nexum"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Telegram Trigger').item.json.message.photo.slice(-1)[0].file_id }}",
+        "additionalFields": {}
+      },
+      "id": "15526afc-3164-42bf-a4b0-ec6f00f3f7fd",
+      "name": "Obtener Imagen",
+      "position": [
+        1216,
+        224
+      ],
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "webhookId": "45b27d51-ce2e-4c82-bd35-357f0134e0a8",
+      "credentials": {
+        "telegramApi": {
+          "id": "lEIDK4Z8KECUOfbU",
+          "name": "Nexum"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "={{ $('¿Se tiene una imagen?').item.json.filas[0]['Id Elemento']|| \"0\" }}_{{ $('¿Se tiene una imagen?').item.json.filas[0]['Código de Partida'] || \"0\"}}_{{ $('¿Se tiene una imagen?').item.json.filas[0]['Subcódigo'] || \"0\" }}_{{ $('¿Se tiene una imagen?').item.json.filas[0]['Metrado Ejecutado'] || \"0\" }}_{{ $('¿Se tiene una imagen?').item.json.filas[0]['Fecha de Ejecución'] || \"0\"}}_{{ $('¿Se tiene una imagen?').item.json.filas[0]['% de Ejecución'] || \"0\"}}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "14ExJBTyxn394JA5ELrx5EkYrlQ0GTIas",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "1ea14259-145c-4552-8e92-ef60278f00fc",
+      "name": "Subir y renombrar imagen",
+      "position": [
+        1392,
+        224
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "odk1JLUq4esejwO3",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtenemos todos los elementos entrantes (Los de Drive)\nconst itemsDrive = $input.all();\nlet resultados = [];\n\n// Obtenemos los datos originales (Id Elemento, Metrado, etc.) del nodo anterior\n// Usamos $items() que es la función más robusta en n8n\nlet itemsEstructura = [];\ntry {\n    // IMPORTANTE: Este nombre debe coincidir exactamente con el de tu nodo\n    itemsEstructura = $items(\"¿Se tiene una imagen?\");\n} catch (error) {\n    console.log(\"No se ejecutó el nodo anterior o el nombre es distinto\");\n}\n\n// Iteramos elemento por elemento, esto evita errores si n8n procesa varios a la vez\nfor (let i = 0; i < itemsDrive.length; i++) {\n    \n    // 1. Extraemos URL de la imagen\n    let url_foto = \"No se registra\";\n    if (itemsDrive[i].json && itemsDrive[i].json.webContentLink) {\n        url_foto = itemsDrive[i].json.webContentLink;\n    }\n    \n    // 2. Extraemos los datos del reporte original asociados a este mismo registro (índice 'i')\n    // Si no los extrae de \"¿Se tiene una imagen?\", usa el mismo item actual como respaldo\n    let datosFila = (itemsEstructura[i] && itemsEstructura[i].json) ? itemsEstructura[i].json : itemsDrive[i].json;\n    \n    // Extraemos la Clase y los 6 inputs de tus filas\n    const clase = datosFila.Clase || datosFila.clase || \"INVALIDO\";\n    const fila = (datosFila.filas && datosFila.filas.length > 0) ? datosFila.filas[0] : {};\n    \n    // 3. Estructuramos el resultado final plano (sin \"filas\")\n    resultados.push({\n        json: {\n            clase: clase,\n            ...fila,\n            url_foto: url_foto\n        }\n    });\n}\n\nreturn resultados;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        432
+      ],
+      "id": "bbb7b90b-4153-411c-ab9b-12445f1be7ce",
+      "name": "Preparar fila individual"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $('Telegram Trigger').first().json.message.document ? \"✅ ¡Listo! El archivo de texto ha sido procesado y todas sus filas fueron guardadas en la base de datos.\" : \"✅ ¡Listo! El elemento individual fue guardado exitosamente en la base de datos.\" }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Confirmación",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2144,
+        160
+      ],
+      "webhookId": "34eb7c32-761c-457e-80ec-0046c0dcea60",
+      "executeOnce": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "lEIDK4Z8KECUOfbU",
+          "name": "Nexum"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "¿Tiene archivo .txt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificador IA": {
+      "main": [
+        [
+          {
+            "node": "Text a json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tiene archivo .txt?": {
+      "main": [
+        [
+          {
+            "node": "Leer contenido .txt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clasificador IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer contenido .txt": {
+      "main": [
+        [
+          {
+            "node": "Procesar contenido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es inválido?": {
+      "main": [
+        [
+          {
+            "node": "Enviar error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enrutar por Clase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrutar por Clase": {
+      "main": [
+        [
+          {
+            "node": "¿Se tiene una imagen?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar filas TXT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Se tiene una imagen?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar filas TXT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar filas TXT": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Clasificador IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text a json": {
+      "main": [
+        [
+          {
+            "node": "¿Es inválido?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Se tiene una imagen?": {
+      "main": [
+        [
+          {
+            "node": "Obtener Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar fila individual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener Imagen": {
+      "main": [
+        [
+          {
+            "node": "Subir y renombrar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar en Base Data": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar contenido": {
+      "main": [
+        [
+          {
+            "node": "¿Es inválido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Confirmación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guardar en Base Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir y renombrar imagen": {
+      "main": [
+        [
+          {
+            "node": "Preparar fila individual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar fila individual": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "a1181478-e84a-4024-90a3-bad11c67e2d3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d43a18df185d7ebf006093c7f6531c36936e77ed6815b2a0dda24a1c18968a2d"
+  },
+  "id": "ZySg5prkEWLLlqAW",
+  "tags": []
+}
